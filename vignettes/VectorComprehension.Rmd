@@ -1,0 +1,199 @@
+---
+title: "Introduction to Vector Comprehension"
+author: "Christopher Mann"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to Vector Comprehension}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+List comprehension is an alternative method of writing `for` loops or `lapply` *(and similar)* functions that is readable, quick, and easy to use. Many newcomers to R struggle with using the `lapply` family of functions and default to using `for`. However, `for` loops are extremely slow in R and should be avoided. Comprehensions in the `eList` package bridge the gap by allowing users to write `lapply` or `sapply` functions using `for` loops.
+
+This vignette describes how to use list and other comprehensions. It also explores comprehensions with multiple variables, `if-else` conditions, nested comprehensions, and parallel comprehensions. 
+
+## List Comprehension
+
+Let us start with a simple example: we have a vector of fruit names and want to create a sequence for each based on the number of characters. One common method is to write a `for` statement where we loop across each fruit name, create a sequence from the numbers, and place it in a list.
+
+```{r}
+x <- c("apples", "bananas", "pears")
+
+fruit_chars <- vector("list", length(x))
+for (i in seq_along(x)){
+  fruit_chars[[i]] <- 1:nchar(x[i])
+}
+fruit_chars
+```
+
+Alternatively, we could use a faster, vectorized function such as `lapply`. This is similar to the `for` loop, except that a specified function is applied to each fruit name and the results are wrapped in a list.
+
+```{r}
+fruit_chars <- lapply(x, function(i) 1:nchar(i))
+```
+
+The `eList` package allows for a hybrid variant of the two using the `List()` function. The `for` loop evaluates the expression and merges the results into a list. Beneath the scenes, `List` is parsing the statement into `lapply` and evaluating it. As we will see, though, there are additional features in `List`.
+
+```{r}
+library(eList)
+fruit_chars <- List(for (i in x) 1:nchar(i))
+```
+
+If you are coming from Python or another language that uses list comprehension, you will notice that this syntax is a bit different; it is written more similar to standard `for` loops in R. The `for` statement comes first, then the variable name and sequence are placed in parentheses. Finally the expression is placed afterwards. The expression can be wrapped in braces `{}` if desired.
+
+
+## Assigning Names
+
+The lists of numbers in the previous examples may be confusing. Luckily, `List` and other comprehension functions allow us to assign names to each result using the notation: `name = expr`. 
+
+```{r}
+List(for (i in x) i = 1:nchar(i))
+```
+The name can be any type of expression. Though complex expressions should be wrapped in parentheses so that the parser does not confuse who has the `=` sign.
+
+```{r}
+List(for (i in x) (if (i == "bananas") "good" else "bad") = 1:nchar(i))
+```
+
+## Conditions - if-else
+
+The results of a comprehension can be filtered using standard `if` statements after naming the variables and sequence, making sure that the condition is placed in parentheses. The statement below only returns the sequence for `"bananas"`. 
+
+```{r}
+List(for (i in x) if (i == "bananas") 1:nchar(i))
+```
+
+Any statement that evaluates to `NULL` is automatically filtered from the results. `else` statements can also be included so that the results are not filtered out *(unless the `else` statement evaluates to `NULL`)*.
+
+```{r}
+List(for (i in x) if (i == "bananas") "delicious" else "ewww")
+```
+
+Each entry can still be assigned a name. Furthermore, the expression can be as complex as necessary for the task with any number of `else if` checks.
+
+```{r}
+List(for (i in x) i = {
+  n <- nchar(i)
+  if (n > 6) "delicious"
+  else if (n > 5) "ok"
+  else "ewww"
+})
+```
+
+## Multiple Variables
+
+Comprehensions can have multiple variables if the variables are separated using `"."` within a single name. To see how this works, let us use the `enum` function in the `eList` package. When `enum` is used on a variable, the first value becomes its index in the loop and the second is the value of the vector at that index. Now, when we use `(i.j in enum(x))`, `i =` the index number of each item in `x`, while `j =` the value of the item in `x` *(the name of the fruit)*.
+
+```{r}
+List(for (i.j in enum(x)) j = i)
+```
+
+Let us inspect `enum(x)` to see what is going on beneath the surface. `enum` took the vector `x` and created a new list at each index. The first list contains two elements: the first being `1` *(the index number)*, the second being `"apples"` *(the first value in `x`)*. 
+
+```{r}
+enum(x)
+```
+
+When multiple variables like `i.j` are passed to the `for` loop, then `i` is assigned to the first element and `j` to the second element for item in the sequence. There can be any number of variables as long as they are separated by `"."`. There does not have to be a variable for each element; but there does need to be an element for each item or else an "out-of-bounds" error will be produced.
+
+```{r}
+y <- list(a = 1:3, b = 4:6, c = 7:9)
+List(for (i.j.k in y) (i+j)/k)
+
+```
+
+Similarly, variables can be skipped. The function below extracts the first and third elements of each item in the list.
+
+```{r}
+List(for (i..j in y) c(i, j))
+```
+
+If only the first or second item is needed, though, you should use two dots: `i..` for the first, `..i` for the second.
+
+Another convenient function that can be used on the sequence is `items()`. It is similar to `enum`, except that the name of each item is used instead of its index number. See the documentation for `eList` for other helper functions.
+
+```{r}
+List(for (i.j in items(y)) paste0(i, j))
+```
+
+## Other Return Types
+
+All of the examples so far have returned a list. However, `eList` supports a variety of different types of comprehension. For example, `Num` returns a numeric vector, while `Chr` returns a character vector. `Env` can be used to produce an environment, similar to dictionary comprehensions in Python. Note that each entry in an environment must have a unique name. These work by coercing the result into particular type, producing an error if unable.
+
+```{r}
+Num(for (i.j.k in y) (i+j)/k)
+Chr(for (i.j.k in y) (i+j)/k)
+```
+One convenience function is `..`. It can be used as either `..[for ...]` or `..(for ...)`. By default, it attempts to simplify the results in an array, but can mimic any other type of comprehension.
+
+```{r}
+..[for (i.j.k in y) (i+j)/k]
+```
+
+## Nested Loops
+
+Multiple `for` loops can be used within a comprehension. As long the subsequent `for` statements immediately follow the variables & sequence of the previous one, or immediately follow a `if-else` statement, then it will be parsed into a vectorized `lapply` style function. Nested loops should be avoided unless necessary since they can be difficult to understand. The following are a couple examples using matrix and numeric comprehension.
+
+```{r}
+Mat(for (i in 1:3) for (j in 1:6) i*j)
+```
+```{r}
+Num(for (i in 1:3) for (j in 1:6) if (i==j) i*j)
+```
+
+Vector Comprehensions can also be nested within each other. The code below nests a numeric comprehension within a character comprehension.
+
+```{r}
+Chr(for (i in Num(for (j in 1:3) j^2)) paste0(letters[sqrt(i)], i))
+```
+
+
+## Parallelization
+
+Vector comprehensions also for parallel computations using the `parallel` package. All comprehensions allow the user to supply a cluster, which activates the parallel version of `sapply` or `lapply`. `eList` comes with a function that allows for the quick creation of a cluster based on the user's operating system and by auto-detecting the number of cores available. Users are recommended to explicitly create a cluster though the functions in the `parallel` package unless a quick parallel calculation is needed. 
+
+```{r eval=FALSE}
+cluster <- auto_cluster(2)
+Num(for (i in 1:100) sample(1:100, 1), clust=cluster)
+close_cluster(cluster)
+```
+
+Note that the additional overhead involved with parallelization means that the gain in performance will be relatively small *(and often negative)* unless the sequence is sufficiently large. Large comprehensions, though, can experience significant gains by specifying a cluster.
+
+
+## Summary Comprehensions
+
+The `eList` package contains a number of summary functions that accept vector comprehensions and/or normal vectors. These functions allow users to combine multiple comprehensions and other vectors in a single function, then apply a summary function to all entries. Each summary comprehension accepts a cluster for parallel computations and the `na.rm` argument. Some examples:
+
+```{r}
+# Are all values greater than 0?
+All(for (i in 1:10) i > 0)
+```
+```{r}
+# Are no values TRUE? (combines comprehension with other values)
+None(for (i in 1:10) i < 0, TRUE, FALSE)
+```
+
+```{r}
+# factorial(5)
+Prod(for (i in 1:5) i)
+```
+```{r}
+# Summary statistics from a random draw of 1000 observations from normal distribution
+Stats(for (i in rnorm(1000)) i)
+```
+
+```{r}
+# Every other letter in the alphabet as a single character
+Paste(for (i in seq(1,26,2)) letters[i], collapse=", ")
+```
+
+
