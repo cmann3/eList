@@ -1,6 +1,6 @@
 Package: eList
 Title: List Comprehension and Tools
-Version: 0.0.1.1
+Version: 0.2.0
 Author: Chris Mann <cmann3@unl.edu>
 Maintainer: Chris Mann <cmann3@unl.edu>
 Description:
@@ -8,12 +8,12 @@ Description:
     'python', 'haskell', and other languages. List comprehension in 'R' converts a 
     regular for() loop into a vectorized lapply() function. Support for looping 
     with multiple variables, parallelization, and across non-standard objects included. Package 
-    also contains a variety of functions to help with list comprehension and 
-    higher order functions for manipulating lists.
+    also contains a variety of functions to help with list comprehension.
 License: MIT + file LICENSE
+BugReports: https://github.com/cmann3/eList/issues
 Encoding: UTF-8
 Suggests: knitr, rmarkdown, stats, parallel
 VignetteBuilder: knitr
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.0.2
+RoxygenNote: 7.1.1
